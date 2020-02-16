@@ -1,8 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
-from dataclasses import dataclass
-
-
+import pickle
+import pprint
+import time
+import progressbar
+import sys
 
 def get_basic_book_data(book_wrapper, book):
     #Scrape basic book data,
@@ -65,17 +67,47 @@ def get_book_data(soup, book):
     get_additional_book_data(book_wrapper, book)
     
     
-
-if __name__ == "__main__":
-    storytel_url = 'https://www.storytel.com/pl/pl/books/1167516'
+def scrape_book_page(page_id, books):
+    #get html data of given page and scrape info from it
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0'}
-
+    storytel_url_base = 'https://www.storytel.com/pl/pl/books/'
+    
+    storytel_url = storytel_url_base + str(page_id)
     r = requests.get(storytel_url, headers=headers)
-    open("video.html", "w", encoding='utf8').write(r.text)
+    #open("video.html", "w", encoding='utf8').write(r.text)
 
     soup = BeautifulSoup(r.text, 'html.parser')
     is_page_avail = soup.select('.heroContentInner')
+    
     if not is_page_avail:
         book = {}
+        book['id'] = page_id
         get_book_data(soup, book)
-        print(book)
+        books.append(book)
+
+
+if __name__ == "__main__":
+    books = []
+    if len(sys.argv) > 1:
+        RANGE_MIN = int(sys.argv[1])
+        RANGE_MAX = int(sys.argv[2])
+    else:
+        RANGE_MIN = 816814
+        RANGE_MAX = 816815
+        print('No range parameters given, testing mode')
+        
+    NUM_OF_PAGES = RANGE_MAX-RANGE_MIN
+    
+    start_time = time.time()
+    with progressbar.ProgressBar(max_value=NUM_OF_PAGES) as bar:
+        for i, page_id in enumerate(range(RANGE_MIN, RANGE_MAX)):
+            scrape_book_page(page_id, books)
+            bar.update(i)
+            #pprint.pprint(books)
+    elapsed_time = round(time.time() - start_time)
+    print(f'SCRAPING {RANGE_MAX-RANGE_MIN} pages took {elapsed_time} sec')
+    print(f'Found {len(books)} books')
+    
+    with open("books.txt", "wb") as fp:   #Pickling
+        pickle.dump(books, fp)
+    print(f'Books list pickled to books.txt')
