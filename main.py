@@ -6,6 +6,7 @@ import time
 import progressbar
 import sys
 
+
 def get_basic_book_data(book_wrapper, book):
     #Scrape basic book data,
     #ex. title, author, desc and store it in dict book
@@ -15,7 +16,6 @@ def get_basic_book_data(book_wrapper, book):
     book_author = book_wrapper.select_one('.expandAuthorName').text.strip()
     book['author'] = book_author
 
-    
     audiobook_or_ebook = book_wrapper.select_one('.expandReleaseDate').text[:-2].strip()
     book['audiobook_or_ebook'] = audiobook_or_ebook
 
@@ -27,6 +27,7 @@ def get_basic_book_data(book_wrapper, book):
 
     book_category = book_wrapper.select_one('.expandCat').text[11:].strip()
     book['category'] = book_category
+
 
 def get_additional_book_data(book_wrapper, book):
     #Scrape additional book data (if it exists),
@@ -57,33 +58,61 @@ def get_additional_book_data(book_wrapper, book):
         elif 'Czas trwania' in book_elem.text:
             book_audio_length = book_elem.text[14:].strip()
             book['audio_length'] = book_audio_length
-            
+
+
 def get_book_data(soup, book):
     #Scrape book data from site
-    book_wrapper = soup.select_one('#bookDetailWrapper')
-
-    get_basic_book_data(book_wrapper, book)
    
+    book_wrapper = soup.select_one('#bookDetailWrapper')
+    get_basic_book_data(book_wrapper, book)
     get_additional_book_data(book_wrapper, book)
     
     
-def scrape_book_page(page_id, books):
+def scrape_book_page(page_id):
     #get html data of given page and scrape info from it
+    #return book dictionary if there is book available, else return None
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0'}
     storytel_url_base = 'https://www.storytel.com/pl/pl/books/'
     
     storytel_url = storytel_url_base + str(page_id)
     r = requests.get(storytel_url, headers=headers)
+    #r = requests.get(storytel_url)
     #open("video.html", "w", encoding='utf8').write(r.text)
 
     soup = BeautifulSoup(r.text, 'html.parser')
-    is_page_avail = soup.select('.heroContentInner')
-    
-    if not is_page_avail:
-        book = {}
-        book['id'] = page_id
-        get_book_data(soup, book)
-        books.append(book)
+    is_access_denied = soup.select_one('#cf-wrapper')
+
+    if not is_access_denied:
+        is_page_avail = soup.select('.heroContentInner')
+        if not is_page_avail:
+            book = {}
+            book['id'] = page_id
+            get_book_data(soup, book)
+            return book
+        return None
+    else:
+        print('access denied')
+        return None
+
+def pickle_to_file(data, filename='books.txt', append=False):
+    #pickles data to file
+    if append:
+        parameters = 'ab'
+    else:
+        parameters = 'wb'
+    with open(filename, parameters) as fp:   #Pickling
+        pickle.dump(data, fp)
+    print(f'Books list pickled to books.txt')
+
+def scrape_page_range(books, range_min, range_max):
+    #Scrapes page range of books
+    #Appends found books to books dict
+    with progressbar.ProgressBar(max_value=NUM_OF_PAGES) as bar:
+        for i, page_id in enumerate(range(range_min, range_max)):
+            book = scrape_book_page(page_id)
+            if book:
+                books.append(book)
+            bar.update(i)
 
 
 if __name__ == "__main__":
@@ -99,15 +128,11 @@ if __name__ == "__main__":
     NUM_OF_PAGES = RANGE_MAX-RANGE_MIN
     
     start_time = time.time()
-    with progressbar.ProgressBar(max_value=NUM_OF_PAGES) as bar:
-        for i, page_id in enumerate(range(RANGE_MIN, RANGE_MAX)):
-            scrape_book_page(page_id, books)
-            bar.update(i)
-            #pprint.pprint(books)
+    scrape_page_range(books, RANGE_MIN, RANGE_MAX)
     elapsed_time = round(time.time() - start_time)
+
+    #pprint.pprint(books)
     print(f'SCRAPING {RANGE_MAX-RANGE_MIN} pages took {elapsed_time} sec')
     print(f'Found {len(books)} books')
-    
-    with open("books.txt", "wb") as fp:   #Pickling
-        pickle.dump(books, fp)
-    print(f'Books list pickled to books.txt')
+    if len(books) > 0:
+        pickle_to_file(books)
