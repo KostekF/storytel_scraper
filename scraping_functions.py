@@ -2,6 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import progressbar
 import logging
+from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import as_completed
+
 
 logging.basicConfig(filename='logs.txt',
                             filemode='a',
@@ -87,10 +90,9 @@ def scrape_book_page(page_id):
     is_access_denied = soup.select_one('#cf-wrapper')
 
     if not is_access_denied:
-        is_page_avail = soup.select('.heroContentInner')
-        if not is_page_avail:
-            book = {}
-            book['id'] = page_id
+        is_page_unavail = soup.select('.heroContentInner')
+        if not is_page_unavail:
+            book = {'page_id': page_id}
             get_book_data(soup, book)
             return book
         return None
@@ -103,14 +105,16 @@ def scrape_book_page(page_id):
 def scrape_page_range(books, range_min, range_max):
     #Scrapes page range of books
     #Appends found books to books dict
-    #TODO: create one progress bar for all proccesses?
-
     with progressbar.ProgressBar(max_value=range_max-range_min) as bar:
-        for i, page_id in enumerate(range(range_min, range_max)):
-            #print('scraping book id=%d'%page_id)
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_url = {executor.submit(scrape_book_page, page_id)
+                             for page_id in range(range_min, range_max)}
 
-            book = scrape_book_page(page_id)
-            if book:
-                book['page_id'] = page_id
-                books.append(book)
-            bar.update(i)
+            for i, future in enumerate(as_completed(future_to_url)):
+                try:
+                    book = future.result()
+                    if book:
+                        books.append(book)
+                except Exception as exc:
+                    print('generated an exception: %s' % exc)
+                bar.update(i)
