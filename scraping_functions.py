@@ -1,6 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 import progressbar
+import logging
+
+logging.basicConfig(filename='logs.txt',
+                            filemode='a',
+                            format='%(asctime)s; LEVEL: %(levelname)s; MESSAGE:%(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S',
+                            level=logging.INFO)
 
 
 def get_basic_book_data(book_wrapper, book):
@@ -88,6 +95,7 @@ def scrape_book_page(page_id):
             return book
         return None
     else:
+        logging.warning(f'Access denied on page {page_id}')
         print('access denied')
         return None
 
@@ -106,12 +114,3 @@ def scrape_page_range(books, range_min, range_max):
                 book['page_id'] = page_id
                 books.append(book)
             bar.update(i)
-'''
-    for i, page_id in enumerate(range(range_min, range_max)):
-        # print('scraping book id=%d'%page_id)
-
-        book = scrape_book_page(page_id)
-        if book:
-            book['page_id'] = page_id
-            books.append(book)
-'''
