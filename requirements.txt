@@ -1,11 +1,15 @@
 beautifulsoup4==4.8.2
 certifi==2019.11.28
 chardet==3.0.4
+dnspython==1.16.0
 idna==2.8
+mysql-connector-python==8.0.19
 progressbar2==3.47.0
+protobuf==3.6.1
 python-utils==2.3.0
 requests==2.22.0
 six==1.14.0
 soupsieve==1.9.5
+tqdm==4.43.0
 urllib3==1.25.8
 user-agent==0.1.9
